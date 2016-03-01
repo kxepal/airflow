@@ -465,6 +465,7 @@ class ConfigParserWithDefaults(ConfigParser):
         ConfigParser.read(self, filenames)
         self._validate()
 
+
 def mkdir_p(path):
     try:
         os.makedirs(path)
@@ -534,6 +535,7 @@ conf.read(AIRFLOW_CONFIG)
 def get(section, key, **kwargs):
     return conf.get(section, key, **kwargs)
 
+
 def getboolean(section, key):
     return conf.getboolean(section, key)
 
@@ -549,14 +551,17 @@ def getint(section, key):
 def has_option(section, key):
     return conf.has_option(section, key)
 
+
 def remove_option(section, option):
     return conf.remove_option(section, option)
+
 
 def set(section, option, value):  # noqa
     return conf.set(section, option, value)
 
 ########################
 # convenience method to access config entries
+
 
 def get_dags_folder():
     return os.path.expanduser(get('core', 'DAGS_FOLDER'))

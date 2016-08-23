@@ -1,0 +1,21 @@
+dags:
+  example_branch_operator_yaml:
+    args:
+      schedule_interval: @daily
+      owner: airflow
+      start_date: 2016-08-20
+    operators:
+      first:
+        class: airflow.operators:DummyOperator
+      second:
+        class: airflow.operators:DummyOperator
+      third:
+        class: airflow.operators:DummyOperator
+      fourth:
+        class: airflow.operators:DummyOperator
+    flow:
+      first:
+        - second
+        - third
+      third:
+        - fourth

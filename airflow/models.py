@@ -53,7 +53,7 @@ from sqlalchemy.orm import relationship, synonym
 from croniter import croniter
 import six
 
-from airflow import settings, utils
+from airflow import declarative, settings, utils
 from airflow.executors import DEFAULT_EXECUTOR, LocalExecutor
 from airflow import configuration
 from airflow.exceptions import AirflowException, AirflowSkipException
@@ -228,16 +228,11 @@ class DagBag(LoggingMixin):
             return found_dags
 
         mods = []
-        if not zipfile.is_zipfile(filepath):
-            if safe_mode and os.path.isfile(filepath):
-                with open(filepath, 'rb') as f:
-                    content = f.read()
-                    if not all([s in content for s in (b'DAG', b'airflow')]):
-                        return found_dags
+        file_name, file_ext = os.path.splitext(os.path.split(filepath)[-1])
 
+        if file_ext == '.py':
             self.logger.debug("Importing {}".format(filepath))
-            org_mod_name, file_ext = os.path.splitext(os.path.split(filepath)[-1])
-            mod_name = 'unusual_prefix_' + org_mod_name
+            mod_name = 'unusual_prefix_' + file_name
 
             if mod_name in sys.modules:
                 del sys.modules[mod_name]
@@ -251,7 +246,19 @@ class DagBag(LoggingMixin):
                     self.import_errors[filepath] = str(e)
                     self.file_last_changed[filepath] = dttm
 
-        else:
+            self.fill_found_dags(filepath, mods, found_dags)
+
+        elif file_ext in {'.yaml', '.yml'}:
+            for dag in declarative.load_dags(filepath):
+                if not dag.full_filepath:
+                    dag.full_filepath = filepath
+                dag.is_subdag = False
+                dag.module_name = os.path.basename(filepath)
+                self.bag_dag(dag, parent_dag=dag, root_dag=dag)
+                found_dags.append(dag)
+                found_dags += dag.subdags
+
+        elif zipfile.is_zipfile(filepath):
             zip_file = zipfile.ZipFile(filepath)
             for mod in zip_file.infolist():
                 head, tail = os.path.split(mod.filename)
@@ -260,15 +267,6 @@ class DagBag(LoggingMixin):
                     if mod_name == '__init__':
                         self.logger.warning("Found __init__.{0} at root of {1}".
                                             format(ext, filepath))
-
-                    if safe_mode:
-                        with zip_file.open(mod.filename) as zf:
-                            self.logger.debug("Reading {} from {}".
-                                              format(mod.filename, filepath))
-                            content = zf.read()
-                            if not all([s in content for s in (b'DAG', b'airflow')]):
-                                # todo: create ignore list
-                                return found_dags
 
                     if mod_name in sys.modules:
                         del sys.modules[mod_name]
@@ -282,6 +280,15 @@ class DagBag(LoggingMixin):
                         self.import_errors[filepath] = str(e)
                         self.file_last_changed[filepath] = dttm
 
+            self.fill_found_dags(filepath, mods, found_dags)
+
+        else:
+            return found_dags
+
+        self.file_last_changed[filepath] = dttm
+        return found_dags
+
+    def fill_found_dags(self, filepath, mods, found_dags):
         for m in mods:
             for dag in list(m.__dict__.values()):
                 if isinstance(dag, DAG):
@@ -292,9 +299,6 @@ class DagBag(LoggingMixin):
                     self.bag_dag(dag, parent_dag=dag, root_dag=dag)
                     found_dags.append(dag)
                     found_dags += dag.subdags
-
-        self.file_last_changed[filepath] = dttm
-        return found_dags
 
     @provide_session
     def kill_zombies(self, session):

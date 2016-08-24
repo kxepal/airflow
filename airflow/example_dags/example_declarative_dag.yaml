@@ -1,9 +1,10 @@
 dags:
-  example_branch_operator_yaml:
+  example_declarative_dag:
     args:
-      schedule_interval: @daily
-      owner: airflow
-      start_date: 2016-08-20
+      schedule_interval: '@daily'
+      default_args:
+        owner: airflow
+        start_date: 2016-08-20
     operators:
       first:
         class: airflow.operators:DummyOperator

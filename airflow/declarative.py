@@ -106,16 +106,35 @@ def build_operator(dag, operator_id, scheme, operator_class=GenericOperator):
 
 def build_flow(tasks, scheme):
     for idx, upstream in scheme.items():
-        tasks[idx].set_upstream(upstream)
+        tasks[idx].set_upstream(tasks[task_id] for task_id in upstream)
 
 
 def transform_args(args):
-    if 'schedule_interval' in args:
-        value = args['schedule_interval']
-        if isinstance(value, int):
-            value = datetime.timedelta(seconds=value)
-        args['schedule_interval'] = value
+    for key, func in [('default_args', transform_args),
+                      ('start_date', transform_date),
+                      ('end_date', transform_date),
+                      ('schedule_interval', transform_schedule_interval),
+                      ]:
+        transform(args, key, func)
     return args
+
+
+def transform_date(value):
+    if isinstance(value, datetime.date):
+        time = datetime.datetime.min.time()
+        value = datetime.datetime.combine(value, time)
+    return value
+
+
+def transform_schedule_interval(value):
+    if isinstance(value, int):
+        value = datetime.timedelta(seconds=value)
+    return value
+
+
+def transform(args, key, func):
+    if key in args:
+        args[key] = func(args[key])
 
 
 def import_object(value):

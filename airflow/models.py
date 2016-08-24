@@ -53,7 +53,7 @@ from sqlalchemy.orm import relationship, synonym
 from croniter import croniter
 import six
 
-from airflow import declarative, settings, utils
+from airflow import settings, utils
 from airflow.executors import DEFAULT_EXECUTOR, LocalExecutor
 from airflow import configuration
 from airflow.exceptions import AirflowException, AirflowSkipException
@@ -249,6 +249,8 @@ class DagBag(LoggingMixin):
             self.fill_found_dags(filepath, mods, found_dags)
 
         elif file_ext in {'.yaml', '.yml'}:
+            self.logger.debug("Importing {}".format(filepath))
+            from airflow import declarative
             for dag in declarative.load_dags(filepath):
                 if not dag.full_filepath:
                     dag.full_filepath = filepath
@@ -399,10 +401,6 @@ class DagBag(LoggingMixin):
                     try:
                         filepath = os.path.join(root, f)
                         if not os.path.isfile(filepath):
-                            continue
-                        mod_name, file_ext = os.path.splitext(
-                            os.path.split(filepath)[-1])
-                        if file_ext != '.py':
                             continue
                         if not any(
                                 [re.findall(p, filepath) for p in patterns]):
@@ -3405,3 +3403,6 @@ class ImportError(Base):
     timestamp = Column(DateTime)
     filename = Column(String(1024))
     stacktrace = Column(Text)
+
+
+
